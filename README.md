@@ -1,3 +1,3 @@
 # emulador6502
 
-Simple emulator for the processor 6502 writen in Rust.
+Simple emulator for the processor 6502 written in Rust.

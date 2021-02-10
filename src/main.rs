@@ -87,9 +87,9 @@ impl CPU {
         memory.data[addr as usize]
     }
 
-    fn lda_set_status(&mut self) {
-        self.ps.set_z(self.a == 0);
-        self.ps.set_n((self.a & 0b1000000) > 0);
+    fn set_zero_and_negative_flags(&mut self, register: u8) {
+        self.ps.set_z(register == 0);
+        self.ps.set_n((register & 0b1000000) > 0);
     }
 
     fn execute(&mut self, mut cycles: u32, memory: &mut MEM) {
@@ -100,18 +100,17 @@ impl CPU {
                 CPU::INS_LDA_IM => {
                     let value: u8 = self.fetch_byte(&mut cycles, memory);
                     self.a = value;
-                    self.lda_set_status();
+                    self.set_zero_and_negative_flags(self.a);
                 },
                 CPU::INS_LDA_ZP => {
                     let zero_page_addr = self.fetch_byte(&mut cycles, memory) as u16;
                     self.a = self.read_byte(&mut cycles, memory,zero_page_addr);                    
-                    self.lda_set_status();
+                    self.set_zero_and_negative_flags(self.a);
                 },
                 CPU::INS_LDA_ZX => {
                     let zero_page_addr = (self.fetch_byte(&mut cycles, memory) + self.x) as u16;
                     cycles -= 1;
-                    self.a = self.read_byte(&mut cycles, memory, zero_page_addr);                    
-                    self.lda_set_status();
+                    self.a = self.read_byte(&mut cycles, memory, zero_page_addr);
                 },
                 CPU::INS_JSR => {
                     let sub_addr = self.fetch_word(&mut cycles, memory);
