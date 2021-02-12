@@ -82,9 +82,21 @@ impl CPU {
         return data;
     }
 
-    fn read_byte(&mut self, cycles: &mut u32, memory: &MEM, addr: u16) -> u8 {
+    fn read_byte(cycles: &mut u32, memory: &MEM, addr: u16) -> u8 {
         *cycles -= 1;
         memory.data[addr as usize]
+    }
+
+    fn read_word(cycles: &mut u32, memory: &MEM, addr: u16) -> u16 {
+        *cycles -= 1;
+        let low_byte = memory.data[addr as usize];
+        let hi_byte = memory.data[(addr + 1) as usize];
+
+        (low_byte | (hi_byte << 8)) as u16
+    }
+
+    fn addr_absolute(&mut self, cycles: &mut u32, memory: &MEM) -> u16 {
+        self.fetch_word(cycles, memory)
     }
 
     fn set_zero_and_negative_flags(&mut self, register: u8) {
@@ -104,13 +116,49 @@ impl CPU {
                 },
                 CPU::INS_LDA_ZP => {
                     let zero_page_addr = self.fetch_byte(&mut cycles, memory) as u16;
-                    self.a = self.read_byte(&mut cycles, memory,zero_page_addr);                    
+                    self.a = CPU::read_byte(&mut cycles, memory, zero_page_addr);                    
                     self.set_zero_and_negative_flags(self.a);
                 },
                 CPU::INS_LDA_ZX => {
                     let zero_page_addr = (self.fetch_byte(&mut cycles, memory) + self.x) as u16;
                     cycles -= 1;
-                    self.a = self.read_byte(&mut cycles, memory, zero_page_addr);
+                    self.a = CPU::read_byte(&mut cycles, memory, zero_page_addr);
+                },
+                CPU::INS_LDA_AB => {
+                    let addr = self.addr_absolute(&mut cycles, memory);
+                    self.a = CPU::read_byte(&mut cycles, memory, addr);
+                },
+                CPU::INS_LDA_AX => {
+                    let addr = self.addr_absolute(&mut cycles, memory);
+                    let addr_x = addr + self.x as u16;
+                    self.a = CPU::read_byte(&mut cycles, memory, addr_x);
+                },
+                CPU::INS_LDA_AY => {
+                    let addr = self.addr_absolute(&mut cycles, memory);
+                    let addr_y = addr + self.y as u16;
+                    
+                    if (addr ^ addr_y) >> 8 == 0 {
+                        cycles -= 1;
+                    }
+
+                    self.a = CPU::read_byte(&mut cycles, memory, addr_y);
+                },
+                CPU::INS_LDA_IX => {
+                    let zero_page_addr_x: u8 = self.fetch_byte(&mut cycles, memory) + self.x;
+                    cycles -= 1;
+                    let effective_addr: u16 = CPU::read_word(&mut cycles, memory, zero_page_addr_x as u16);
+                    self.a = CPU::read_byte(&mut cycles, memory, effective_addr);
+                },
+                CPU::INS_LDA_IY => {
+                    let zero_page_addr: u8 = self.fetch_byte(&mut cycles, memory);
+                    let effective_addr: u16 = CPU::read_word(&mut cycles, memory, zero_page_addr as u16);
+                    let effective_addr_y: u16 = effective_addr + self.y as u16;
+                    
+                    if (effective_addr ^ effective_addr_y) >> 8 == 0{
+                        cycles -= 1;
+                    }
+
+                    self.a = CPU::read_byte(&mut cycles, memory, effective_addr_y);
                 },
                 CPU::INS_JSR => {
                     let sub_addr = self.fetch_word(&mut cycles, memory);
@@ -118,7 +166,7 @@ impl CPU {
                     self.pc = sub_addr;
                     self.sp += 1;
                     cycles -= 1;
-                }
+                },
                 _ => print!("Instruction not handled {0}", instruction),
             };
         }
